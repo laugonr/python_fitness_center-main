@@ -1,16 +1,7 @@
 '''
 Campus Fitness Center Management - OOP Version
-
-Refactored from procedural to object-oriented design.
-
-Features:
-- Manage members (add, list, update status)
-- Manage classes (create, list, enroll members)
-- Manage trainer schedules
-- Simple billing with membership-type-based discounts
-
-Data is stored in a FitnessCenter manager backed by Member, FitnessClass,
-and Trainer dataclasses.
+Manages members, classes, trainers, and basic billing.
+Data lives in a FitnessCenter object backed by Member, FitnessClass, and Trainer dataclasses.
 '''
 
 import sys
@@ -114,6 +105,14 @@ def read_int(prompt, min_value=None, max_value=None):
             print('Please enter a valid integer.')
 
 
+def read_float(prompt):  # fixed: extracted to avoid duplicated try/except in billing functions
+    while True:
+        try:
+            return float(input(prompt))
+        except ValueError:
+            print('Please enter a valid number.')
+
+
 def read_nonempty(prompt):
     while True:
         value = input(prompt).strip()
@@ -144,7 +143,8 @@ def run_menu(title: str, options: list) -> None:
         choice = read_int('Choice: ', min_value=1, max_value=back)
         if choice == back:
             break
-        options[choice - 1][1]()
+        _, action = options[choice - 1]  # fixed: unpack instead of chained index
+        action()
         pause()
 
 
@@ -158,7 +158,6 @@ def add_member(fc: FitnessCenter):
         VALID_MEMBERSHIP_TYPES,
         'community',
     )
-
     member = fc.add_member(name, membership_type)
     print(f'Member added with id {member.id}')
 
@@ -203,11 +202,7 @@ def add_charge_to_member(fc: FitnessCenter):
     if member is None:
         print('Member not found.')
         return
-    try:
-        amount = float(input('Charge amount: $'))
-    except ValueError:
-        print('Invalid amount.')
-        return
+    amount = read_float('Charge amount: $')  # fixed: use read_float helper
     member.balance += amount
     print(f"Added ${amount:.2f} to {member.name}'s balance.")
 
@@ -220,11 +215,7 @@ def apply_payment_from_member(fc: FitnessCenter):
     if member is None:
         print('Member not found.')
         return
-    try:
-        amount = float(input('Payment amount: $'))
-    except ValueError:
-        print('Invalid amount.')
-        return
+    amount = read_float('Payment amount: $')  # fixed: use read_float helper
     member.balance -= amount
     print(f'Recorded payment of ${amount:.2f} from {member.name}.')
 
@@ -240,7 +231,6 @@ def create_class(fc: FitnessCenter):
         'beginner',
     )
     capacity = read_int('Capacity: ', min_value=1)
-
     fitness_class = fc.add_class(name, difficulty, capacity)
     print(f'Fitness class created with id {fitness_class.id}')
 
@@ -333,7 +323,6 @@ def add_trainer(fc: FitnessCenter):
         if not slot:
             break
         schedule.append(slot)
-
     trainer = fc.add_trainer(name, specialty, schedule)
     print(f'Trainer added with id {trainer.id}')
 
@@ -365,8 +354,11 @@ def update_trainer_schedule(fc: FitnessCenter):
         return
 
     print('Current schedule:')
-    for s in trainer.schedule:
-        print(f'- {s}')
+    if not trainer.schedule:  # fixed: show message instead of silent empty block
+        print('  No schedule set.')
+    else:
+        for s in trainer.schedule:
+            print(f'- {s}')
 
     print('1. Replace schedule')
     print('2. Add to schedule')
@@ -402,15 +394,21 @@ def show_summary_report(fc: FitnessCenter):
     print(f'Total outstanding balance: ${total_balance:.2f}')
 
     print('\nClasses:')
-    for c in fc.fitness_classes:
-        print(
-            f'- {c.name} ({c.difficulty}): '
-            f'{len(c.enrolled_ids)}/{c.capacity} enrolled'
-        )
+    if not fc.fitness_classes:  # fixed: handle empty list in summary
+        print('  No classes.')
+    else:
+        for c in fc.fitness_classes:
+            print(
+                f'- {c.name} ({c.difficulty}): '
+                f'{len(c.enrolled_ids)}/{c.capacity} enrolled'
+            )
 
     print('\nTrainers:')
-    for t in fc.trainers:
-        print(f'- {t.name} ({t.specialty})')
+    if not fc.trainers:  # fixed: handle empty list in summary
+        print('  No trainers.')
+    else:
+        for t in fc.trainers:
+            print(f'- {t.name} ({t.specialty})')
 
     print()
 
@@ -419,45 +417,46 @@ def show_summary_report(fc: FitnessCenter):
 
 def member_menu(fc: FitnessCenter):
     run_menu('Member Menu', [
-        ('Add member',                lambda: add_member(fc)),
-        ('List members',              lambda: list_members(fc)),
-        ('Deactivate member',         lambda: deactivate_member(fc)),
-        ('Add charge to member',      lambda: add_charge_to_member(fc)),
-        ('Record payment from member',lambda: apply_payment_from_member(fc)),
+        ('Add member',                 lambda: add_member(fc)),
+        ('List members',               lambda: list_members(fc)),
+        ('Deactivate member',          lambda: deactivate_member(fc)),
+        ('Add charge to member',       lambda: add_charge_to_member(fc)),
+        ('Record payment from member', lambda: apply_payment_from_member(fc)),
     ])
 
 
 def classes_menu(fc: FitnessCenter):
     run_menu('Classes Menu', [
-        ('Create fitness class',  lambda: create_class(fc)),
-        ('List fitness classes',  lambda: list_classes(fc)),
-        ('Enroll member in class',lambda: enroll_member_in_class(fc)),
-        ('Show class roster',     lambda: list_class_roster(fc)),
+        ('Create fitness class',   lambda: create_class(fc)),
+        ('List fitness classes',   lambda: list_classes(fc)),
+        ('Enroll member in class', lambda: enroll_member_in_class(fc)),
+        ('Show class roster',      lambda: list_class_roster(fc)),
     ])
 
 
 def trainer_menu(fc: FitnessCenter):
     run_menu('Trainer Menu', [
-        ('Add trainer',            lambda: add_trainer(fc)),
-        ('List trainers',          lambda: list_trainers(fc)),
-        ('Update trainer schedule',lambda: update_trainer_schedule(fc)),
+        ('Add trainer',             lambda: add_trainer(fc)),
+        ('List trainers',           lambda: list_trainers(fc)),
+        ('Update trainer schedule', lambda: update_trainer_schedule(fc)),
     ])
 
 
 def main_menu(fc: FitnessCenter):
     options = [
-        ('Manage members',     lambda: member_menu(fc)),
-        ('Manage classes',     lambda: classes_menu(fc)),
-        ('Manage trainers',    lambda: trainer_menu(fc)),
-        ('Show summary report',lambda: (show_summary_report(fc), pause())),
-        ('Exit',               lambda: (print('Goodbye!'), sys.exit(0))),
+        ('Manage members',      lambda: member_menu(fc)),
+        ('Manage classes',      lambda: classes_menu(fc)),
+        ('Manage trainers',     lambda: trainer_menu(fc)),
+        ('Show summary report', lambda: (show_summary_report(fc), pause())),
+        ('Exit',                lambda: (print('Goodbye!'), sys.exit(0))),
     ]
     while True:
         print('\n=== Campus Fitness Center Management ===')
         for i, (label, _) in enumerate(options, 1):
             print(f'{i}. {label}')
         choice = read_int('Choice: ', min_value=1, max_value=len(options))
-        options[choice - 1][1]()
+        _, action = options[choice - 1]  # fixed: unpack instead of chained index
+        action()
 
 
 if __name__ == '__main__':
